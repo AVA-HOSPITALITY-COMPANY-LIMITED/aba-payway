@@ -1,0 +1,6 @@
+{
+  "watch": ["src", "tsconfig.json"],
+  "ext": "ts,json",
+  "exec": "node -r ts-node/register ./src/index.ts",
+  "ignoreRoot": [".git"]
+}
