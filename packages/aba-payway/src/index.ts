@@ -31,30 +31,58 @@ class ABAPayWayClient {
     return_url: string,
     options?: {}
   ) {
-    const payload = Object.fromEntries(
-      Object.entries({
-        request_time: DateTime.now().toUTC().toFormat("yyyyMMddHHmmss"),
-        merchant_id: this.merchant_id,
-        merchant_auth: publicEncrypt(
-          {
-            key: this.rsa_public_key,
-            padding: constants.RSA_PKCS1_PADDING,
-          },
-          JSON.stringify({
-            mc_id: this.merchant_id,
-            title: title,
-            amount: amount,
-            currency: currency,
-            expired_date: null,
-            return_url: return_url,
-          }).substring(0, 117)
-        ).toString(),
-      }).filter(([k, v]) => v != null)
-    );
-    console.log({
-      ...payload,
-      hash: this.create_hash(Object.values(payload)),
-    });
+    const merchant_authObj = {
+      mc_id: this.merchant_id,
+      title: title,
+      amount: amount,
+      currency: currency,
+      expired_date: Math.round(
+        DateTime.now().plus({ seconds: 120 }).toUTC().toSeconds()
+      ),
+      return_url: return_url,
+    };
+
+    const payload = {
+      request_time: DateTime.now().toUTC().toFormat("yyyyMMddHHmmss"),
+      merchant_id: this.merchant_id,
+      merchant_auth: publicEncrypt(
+        {
+          key: this.rsa_public_key,
+          padding: constants.RSA_PKCS1_PADDING,
+        },
+        JSON.stringify(merchant_authObj).substring(0, 117)
+      ).toString("base64"),
+    };
+
+    const hash = this.create_hash([
+      payload.request_time,
+      payload.merchant_id,
+      payload.merchant_auth,
+    ]);
+
+    const myHeaders = new Headers();
+    myHeaders.append("Content-Type", "multipart/form-data");
+
+    const formdata = new FormData();
+    formdata.append("request_time", payload.request_time);
+    formdata.append("merchant_id", payload.merchant_id);
+    formdata.append("merchant_auth", payload.merchant_auth);
+    formdata.append("hash", hash);
+
+    const requestOptions = {
+      method: "POST",
+      headers: myHeaders,
+      body: formdata,
+      //  redirect: 'follow'
+    };
+
+    fetch(
+      "https://checkout-sandbox.payway.com.kh/api/merchant-portal/merchant-access/payment-link/create",
+      requestOptions
+    )
+      .then((response) => response.text())
+      .then((result) => console.log(result))
+      .catch((error) => console.log("error", error));
   }
 }
 
@@ -70,9 +98,4 @@ KiHd03D+zs5ZMQaSHukIf6h0SMNDuJ3I0t/BEIQzEwz+rpkQ/gfZ7gNvLMEdDWqD
 -----END PUBLIC KEY-----`
 );
 
-client.createPaymentLink(
-  "Test Payment",
-  1000,
-  "KHR",
-  "https://example.com/return"
-);
+client.createPaymentLink("Test", 2000, "KHR", "https://example.com/return");
