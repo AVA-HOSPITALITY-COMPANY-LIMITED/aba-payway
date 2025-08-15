@@ -26,7 +26,7 @@ export interface CheckoutFormData {
   email: string;
   return_params: string;
   merchant_id: string;
-  req_time: number;
+  req_time: string;
 }
 
 export interface CheckoutResponse {
@@ -81,12 +81,12 @@ class ABAPayWayClient {
    * @returns Checkout response with form data and API URL
    */
   public createCheckoutPayment(paymentData: CheckoutPaymentData, useSandbox: boolean = true): CheckoutResponse {
-    const now = Math.floor(Date.now() / 1000); // Unix seconds
+    const now = DateTime.now().toUTC().toFormat('yyyyMMddHHmmss');
     const returnParams = paymentData.returnParams || '';
 
     // Build signature string exactly as PayWay expects
     const signatureValues = [
-      now.toString(),
+      now,
       this.merchant_id,
       paymentData.tranId,
       paymentData.amount,
