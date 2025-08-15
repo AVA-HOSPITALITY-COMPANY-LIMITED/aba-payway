@@ -1,6 +1,6 @@
 {
-  "watch": ["src", "tsconfig.json"],
+  "watch": ["src", "tsconfig.json", "node_modules/aba-payway/dist"],
   "ext": "ts,json",
-  "exec": "node -r ts-node/register ./src/server.ts",
+  "exec": "node --env-file=.env.development.local -r ts-node/register ./src/server.ts",
   "ignoreRoot": [".git"]
 }
