@@ -1,37 +1,32 @@
 import { createHmac, publicEncrypt, KeyLike, constants } from "crypto";
 import { DateTime } from "luxon";
 
-// TypeScript interfaces for checkout payment data
-export interface CheckoutCustomerInfo {
-  firstname: string;
-  lastname: string;
-  phone: string;
-  email: string;
-}
-
-export interface CheckoutPaymentData {
-  tranId: string;
-  amount: string;
-  customerInfo: CheckoutCustomerInfo;
-  returnParams?: string;
-}
-
-export interface CheckoutFormData {
-  hash: string;
+/**
+ * PurchaseData represents user-specific purchase parameters that will be combined with library-specific parameters that is called into the downstream API.
+ * It allows you to create purchases of the appropriate type, amount, etc.
+ *
+ * @interface PurchaseData
+ * @property {string} tran_id - The transaction ID for the purchase.
+ * @property {string} amount - The amount for the purchase.
+ * @property {Object} payer - The payer's information.
+ * @property {string} payer.firstname - The first name of the payer.
+ * @property {string} payer.lastname - The last name of the payer.
+ * @property {string} payer.phone - The phone number of the payer.
+ * @property {string} payer.email - The email address of the payer.
+ * @property {string} [return_params] - Optional return parameters for the transaction.
+ * @property {string} [payment_option] - Optional payment option for the transaction (e
+ */
+export interface PurchaseData {
   tran_id: string;
   amount: string;
-  firstname: string;
-  lastname: string;
-  phone: string;
-  email: string;
-  return_params: string;
-  merchant_id: string;
-  req_time: string;
-}
-
-export interface CheckoutResponse {
-  formData: CheckoutFormData;
-  apiUrl: string;
+  payer?: {
+    firstname?: string;
+    lastname?: string;
+    phone?: string;
+    email?: string;
+  };
+  return_params?: string;
+  payment_option?: string;
 }
 
 class ABAPayWayClient {
@@ -40,109 +35,65 @@ class ABAPayWayClient {
   private api_key: string;
   private rsa_public_key: KeyLike;
 
-  // PayWay checkout API URLs
-  public static readonly SANDBOX_CHECKOUT_URL = 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase';
-  public static readonly PRODUCTION_CHECKOUT_URL = 'https://checkout.payway.com.kh/api/payment-gateway/v1/payments/purchase';
-
   constructor(
-    base_url: string,
     merchant_id: string,
     api_key: string,
-    rsa_public_key: KeyLike
+    rsa_public_key: KeyLike,
+    base_url: string = "https://checkout-sandbox.payway.com.kh" // Default to sandbox URL
   ) {
+    if (base_url.endsWith("/")) {
+      base_url = base_url.slice(0, -1);
+    }
     this.base_url = base_url;
     this.merchant_id = merchant_id;
     this.api_key = api_key;
     this.rsa_public_key = rsa_public_key;
   }
 
-  private create_hash(values: string[]) {
+  private create_hash(values: (string | undefined)[]) {
     const data = values.join("");
     return createHmac("sha512", this.api_key).update(data).digest("base64");
   }
 
-  /**
-   * Creates a hash for checkout payment signature
-   * @param values Array of values to hash in specific order
-   * @returns Base64 encoded hash
-   */
-  public createCheckoutHash(values: string[]): string {
-    const data = values.join("");
-    const hmac = createHmac('sha512', this.api_key)
-      .update(data)
-      .digest();
-    return Buffer.from(hmac).toString('base64');
-  }
-
-  /**
-   * Generates checkout form data for PayWay payment
-   * @param paymentData Payment and customer information
-   * @param useSandbox Whether to use sandbox environment (default: true)
-   * @returns Checkout response with form data and API URL
-   */
-  public createCheckoutPayment(paymentData: CheckoutPaymentData, useSandbox: boolean = true): CheckoutResponse {
-    const now = DateTime.now().toUTC().toFormat('yyyyMMddHHmmss');
-    const returnParams = paymentData.returnParams || '';
+  public createTransaction(purchaseData: PurchaseData): string {
+    const now = DateTime.now().toUTC().toFormat("yyyyMMddHHmmss");
 
     // Build signature string exactly as PayWay expects
     const signatureValues = [
       now,
       this.merchant_id,
-      paymentData.tranId,
-      paymentData.amount,
-      paymentData.customerInfo.firstname,
-      paymentData.customerInfo.lastname,
-      paymentData.customerInfo.email,
-      paymentData.customerInfo.phone,
-      returnParams
+      purchaseData.tran_id,
+      purchaseData.amount,
+      purchaseData.payer?.firstname || "",
+      purchaseData.payer?.lastname || "",
+      purchaseData.payer?.email || "",
+      purchaseData.payer?.phone || "",
+      purchaseData.payment_option || "",
+      purchaseData.return_params || "",
     ];
 
-    const hash = this.createCheckoutHash(signatureValues);
+    const hash = this.create_hash(signatureValues);
 
-    const formData: CheckoutFormData = {
-      hash,
-      tran_id: paymentData.tranId,
-      amount: paymentData.amount,
-      firstname: paymentData.customerInfo.firstname,
-      lastname: paymentData.customerInfo.lastname,
-      phone: paymentData.customerInfo.phone,
-      email: paymentData.customerInfo.email,
-      return_params: returnParams,
-      merchant_id: this.merchant_id,
-      req_time: now
-    };
-
-    const apiUrl = useSandbox ? ABAPayWayClient.SANDBOX_CHECKOUT_URL : ABAPayWayClient.PRODUCTION_CHECKOUT_URL;
-
-    return {
-      formData,
-      apiUrl
-    };
-  }
-
-  /**
-   * Generates HTML form string for PayWay checkout
-   * @param paymentData Payment and customer information
-   * @param useSandbox Whether to use sandbox environment (default: true)
-   * @returns HTML form string ready for submission
-   */
-  public generateCheckoutForm(paymentData: CheckoutPaymentData, useSandbox: boolean = true): string {
-    const checkoutResponse = this.createCheckoutPayment(paymentData, useSandbox);
-    const { formData, apiUrl } = checkoutResponse;
-
+    const endpoint = "/api/payment-gateway/v1/payments/purchase";
     return `
-      <form id="aba_merchant_request" method="POST" target="aba_webservice" action="${apiUrl}">
-        <input type="hidden" name="hash" value="${formData.hash}" />
-        <input type="hidden" name="tran_id" value="${formData.tran_id}" />
-        <input type="hidden" name="amount" value="${formData.amount}" />
-        <input type="hidden" name="firstname" value="${formData.firstname}" />
-        <input type="hidden" name="lastname" value="${formData.lastname}" />
-        <input type="hidden" name="phone" value="${formData.phone}" />
-        <input type="hidden" name="email" value="${formData.email}" />
-        <input type="hidden" name="return_params" value="${formData.return_params}" />
-        <input type="hidden" name="merchant_id" value="${formData.merchant_id}" />
-        <input type="hidden" name="req_time" value="${formData.req_time}" />
+      <form id="aba_merchant_request" method="POST" target="aba_webservice" action="${this.base_url}${endpoint}">
+        <input type="hidden" name="hash" value="${hash}" />
+        <input type="hidden" name="tran_id" value="${purchaseData.tran_id}" />
+        <input type="hidden" name="amount" value="${purchaseData.amount}" />
+        <input type="hidden" name="firstname" value="${purchaseData.payer?.firstname}" />
+        <input type="hidden" name="lastname" value="${purchaseData.payer?.lastname}" />
+        <input type="hidden" name="phone" value="${purchaseData.payer?.phone}" />
+        <input type="hidden" name="email" value="${purchaseData.payer?.email}" />
+        <input type="hidden" name="return_params" value="${purchaseData.return_params}" />
+        <input type="hidden" name="merchant_id" value="${this.merchant_id}" />
+        <input type="hidden" name="req_time" value="${now}" />
+        <input type="hidden" name="payment_option" value="${purchaseData.payment_option}" />
       </form>
+      <iframe name="aba_webservice"></iframe>
+      <script>
+        console.log("Submitting form to PayWay");
+        document.getElementById("aba_merchant_request").submit();
+      </script>
     `;
   }
 
