@@ -86,16 +86,4 @@ class ABAPayWayClient {
   }
 }
 
-const client = new ABAPayWayClient(
-  "https://checkout-sandbox.payway.com.kh",
-  "ec461403",
-  "7561d98442d36c2259663b7cbdf22abf2dcf8c96",
-  `-----BEGIN PUBLIC KEY-----
-MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDa4NkNVTZbFPmfXOco+mGufIKr
-YIogDiptE0u6P/G+fe7iNtHgH5/Iz+aI79awI7dUEQ0PFdBrH9tzEvm366G+RE6X
-KiHd03D+zs5ZMQaSHukIf6h0SMNDuJ3I0t/BEIQzEwz+rpkQ/gfZ7gNvLMEdDWqD
-3S+TzCDVRgJ8jCI3jwIDAQAB
------END PUBLIC KEY-----`
-);
-
-client.createPaymentLink("Test", 2000, "KHR", "https://example.com/return");
+export default ABAPayWayClient;

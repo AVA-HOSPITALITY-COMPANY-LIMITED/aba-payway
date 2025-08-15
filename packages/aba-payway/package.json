@@ -1,10 +1,17 @@
 {
   "name": "aba-payway",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "scripts": {
-    "dev": "nodemon"
+    "dev": "tsup --watch --format esm,cjs --dts --sourcemap",
+    "build": "tsup --format esm,cjs --dts"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/AVA-HOSPITALITY-COMPANY-LIMITED/aba-payway.git"
@@ -21,12 +28,12 @@
     "url": "https://github.com/AVA-HOSPITALITY-COMPANY-LIMITED/aba-payway/issues"
   },
   "homepage": "https://github.com/AVA-HOSPITALITY-COMPANY-LIMITED/aba-payway#readme",
-  "description": "",
+  "description": "NodeJS package for integrating applications with ABA PayWay API",
   "devDependencies": {
     "@types/luxon": "^3.7.1",
     "@types/node": "^24.2.1",
-    "nodemon": "^3.1.10",
-    "ts-node": "^10.9.2"
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2"
   },
   "dependencies": {
     "luxon": "^3.7.1"

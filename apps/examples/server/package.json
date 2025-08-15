@@ -2,13 +2,18 @@
   "name": "server",
   "version": "1.0.0",
   "description": "Example Express.js server that consumes the aba-payway package",
-  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon"
   },
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "aba-payway": "workspace:*",
     "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2"
   }
 }

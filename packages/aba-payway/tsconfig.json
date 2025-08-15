@@ -1,11 +1,19 @@
 {
+  "include": ["src/**/*.ts"],
   "compilerOptions": {
-    "module": "NodeNext",
+    "declaration": true,
+    "declarationMap": true,
     "esModuleInterop": true,
-    "target": "es2021",
-    "moduleResolution": "nodenext",
-    "sourceMap": false,
-    "outDir": "./dist"
-  },
-  "lib": ["es2021"]
+    "incremental": false,
+    "isolatedModules": true,
+    "lib": ["es2022", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleDetection": "force",
+    "moduleResolution": "NodeNext",
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2022"
+  }
 }
