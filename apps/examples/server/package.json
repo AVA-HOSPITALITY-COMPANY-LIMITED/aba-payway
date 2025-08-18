@@ -8,7 +8,9 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@types/cors": "^2.8.19",
     "aba-payway": "workspace:*",
+    "cors": "^2.8.5",
     "express": "^5.1.0"
   },
   "devDependencies": {
