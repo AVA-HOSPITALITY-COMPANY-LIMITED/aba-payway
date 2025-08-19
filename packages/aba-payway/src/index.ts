@@ -1,22 +1,52 @@
 import { createHmac, publicEncrypt, KeyLike, constants } from "crypto";
 import { DateTime } from "luxon";
 
-// TypeScript interfaces for checkout payment data
-export interface CheckoutCustomerInfo {
+export interface ABAPayWayConfig {
+  baseUrl: string;
+  merchantId: string;
+  apiKey: string;
+  rsaPublicKey: KeyLike;
+  sandbox?: boolean; // defaults to true
+}
+
+export interface PaymentRequest {
+  transactionId: string;
+  amount: string;
+  currency?: 'USD' | 'KHR'; // defaults to USD
+  customer: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+  };
+  returnUrl?: string;
+  returnParams?: string;
+}
+
+export interface PaymentResponse {
+  success: boolean;
+  transactionId: string;
+  htmlForm: string;
+  checkoutUrl: string;
+  error?: string;
+}
+
+// Internal interfaces (not exported)
+interface CheckoutCustomerInfo {
   firstname: string;
   lastname: string;
   phone: string;
   email: string;
 }
 
-export interface CheckoutPaymentData {
+interface CheckoutPaymentData {
   tranId: string;
   amount: string;
   customerInfo: CheckoutCustomerInfo;
   returnParams?: string;
 }
 
-export interface CheckoutFormData {
+interface CheckoutFormData {
   hash: string;
   tran_id: string;
   amount: string;
@@ -29,11 +59,12 @@ export interface CheckoutFormData {
   req_time: string;
 }
 
-export interface CheckoutResponse {
+interface CheckoutResponse {
   formData: CheckoutFormData;
   apiUrl: string;
 }
 
+// Internal ABA PayWay client class
 class ABAPayWayClient {
   private base_url: string;
   private merchant_id: string;
@@ -66,7 +97,7 @@ class ABAPayWayClient {
    * @param values Array of values to hash in specific order
    * @returns Base64 encoded hash
    */
-  public createCheckoutHash(values: string[]): string {
+  private createCheckoutHash(values: string[]): string {
     const data = values.join("");
     const hmac = createHmac('sha512', this.api_key)
       .update(data)
@@ -208,5 +239,85 @@ class ABAPayWayClient {
   }
 }
 
-export default ABAPayWayClient;
+/**
+ * Creates an ABA PayWay checkout form with a simplified API
+ * 
+ * @param config - ABA PayWay configuration (baseUrl, merchant ID, API key, RSA public key)
+ * @param payment - Payment request details (amount, customer info, transaction ID, returnParams)
+ * @returns Promise<PaymentResponse> - Contains HTML form and checkout URL
+ * 
+ **/
+export async function createABACheckout(
+  config: ABAPayWayConfig,
+  payment: PaymentRequest
+): Promise<PaymentResponse> {
+  try {
+    // Validate required configuration
+    if (!config.baseUrl || !config.merchantId || !config.apiKey || !config.rsaPublicKey) {
+      throw new Error('Missing required ABA PayWay configuration: baseUrl, merchantId, apiKey, and rsaPublicKey are required');
+    }
+
+    // Validate payment request
+    if (!payment.transactionId || !payment.amount || !payment.customer) {
+      throw new Error('Missing required payment data: transactionId, amount, and customer are required');
+    }
+
+    if (!payment.customer.firstName || !payment.customer.lastName || !payment.customer.email || !payment.customer.phone) {
+      throw new Error('Missing required customer data: firstName, lastName, email, and phone are required');
+    }
+
+    // Create ABA PayWay client instance
+    const client = new ABAPayWayClient(
+      config.baseUrl,
+      config.merchantId,
+      config.apiKey,
+      config.rsaPublicKey
+    );
+
+    // Transform public API to internal format
+    const checkoutData: CheckoutPaymentData = {
+      tranId: payment.transactionId,
+      amount: payment.amount,
+      customerInfo: {
+        firstname: payment.customer.firstName,
+        lastname: payment.customer.lastName,
+        email: payment.customer.email,
+        phone: payment.customer.phone
+      },
+      returnParams: payment.returnParams || ''
+    };
+
+    // Use sandbox by default
+    const useSandbox = config.sandbox !== false;
+
+    // Generate checkout response
+    const checkoutResponse = client.createCheckoutPayment(checkoutData, useSandbox);
+    const htmlForm = client.generateCheckoutForm(checkoutData, useSandbox);
+
+    return {
+      success: true,
+      transactionId: payment.transactionId,
+      htmlForm,
+      checkoutUrl: checkoutResponse.apiUrl
+    };
+  } catch (error) {
+    return {
+      success: false,
+      transactionId: payment.transactionId,
+      htmlForm: '',
+      checkoutUrl: '',
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+}
+
+/**
+ * Legacy class export for backward compatibility
+ * @deprecated Use createABACheckout function instead
+ */
 export { ABAPayWayClient };
+
+/**
+ * Default export points to the simplified API function
+ */
+export default createABACheckout;
