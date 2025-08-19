@@ -5,7 +5,7 @@ export interface ABAPayWayConfig {
   baseUrl: string;
   merchantId: string;
   apiKey: string;
-  rsaPublicKey: KeyLike;
+  rsaPublicKey?: KeyLike; // Optional - only required for payment link creation
   sandbox?: boolean; // defaults to true
 }
 
@@ -155,25 +155,46 @@ class ABAPayWayClient {
    * Generates HTML form string for PayWay checkout
    * @param paymentData Payment and customer information
    * @param useSandbox Whether to use sandbox environment (default: true)
+   * @param autoSubmit Whether to auto-submit the form (default: false)
    * @returns HTML form string ready for submission
    */
-  public generateCheckoutForm(paymentData: CheckoutPaymentData, useSandbox: boolean = true): string {
+  public generateCheckoutForm(paymentData: CheckoutPaymentData, useSandbox: boolean = true, autoSubmit: boolean = false): string {
     const checkoutResponse = this.createCheckoutPayment(paymentData, useSandbox);
     const { formData, apiUrl } = checkoutResponse;
 
+    const autoSubmitScript = autoSubmit ? `
+      <script>
+        document.addEventListener('DOMContentLoaded', function() {
+          document.getElementById('aba_merchant_request').submit();
+        });
+      </script>` : '';
+
     return `
-      <form id="aba_merchant_request" method="POST" target="aba_webservice" action="${apiUrl}">
-        <input type="hidden" name="hash" value="${formData.hash}" />
-        <input type="hidden" name="tran_id" value="${formData.tran_id}" />
-        <input type="hidden" name="amount" value="${formData.amount}" />
-        <input type="hidden" name="firstname" value="${formData.firstname}" />
-        <input type="hidden" name="lastname" value="${formData.lastname}" />
-        <input type="hidden" name="phone" value="${formData.phone}" />
-        <input type="hidden" name="email" value="${formData.email}" />
-        <input type="hidden" name="return_params" value="${formData.return_params}" />
-        <input type="hidden" name="merchant_id" value="${formData.merchant_id}" />
-        <input type="hidden" name="req_time" value="${formData.req_time}" />
-      </form>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Redirecting to ABA PayWay...</title>
+        <style>
+          body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+          .loading { font-size: 18px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="loading">Redirecting to ABA PayWay checkout...</div>
+        <form id="aba_merchant_request" method="POST" action="${apiUrl}">
+          <input type="hidden" name="hash" value="${formData.hash}" />
+          <input type="hidden" name="tran_id" value="${formData.tran_id}" />
+          <input type="hidden" name="amount" value="${formData.amount}" />
+          <input type="hidden" name="firstname" value="${formData.firstname}" />
+          <input type="hidden" name="lastname" value="${formData.lastname}" />
+          <input type="hidden" name="phone" value="${formData.phone}" />
+          <input type="hidden" name="email" value="${formData.email}" />
+          <input type="hidden" name="return_params" value="${formData.return_params}" />
+          <input type="hidden" name="merchant_id" value="${formData.merchant_id}" />
+          <input type="hidden" name="req_time" value="${formData.req_time}" />
+        </form>${autoSubmitScript}
+      </body>
+      </html>
     `;
   }
 
@@ -252,9 +273,9 @@ export async function createABACheckout(
   payment: PaymentRequest
 ): Promise<PaymentResponse> {
   try {
-    // Validate required configuration
-    if (!config.baseUrl || !config.merchantId || !config.apiKey || !config.rsaPublicKey) {
-      throw new Error('Missing required ABA PayWay configuration: baseUrl, merchantId, apiKey, and rsaPublicKey are required');
+    // Validate required configuration for checkout
+    if (!config.baseUrl || !config.merchantId || !config.apiKey) {
+      throw new Error('Missing required ABA PayWay configuration: baseUrl, merchantId, and apiKey are required');
     }
 
     // Validate payment request
@@ -271,7 +292,7 @@ export async function createABACheckout(
       config.baseUrl,
       config.merchantId,
       config.apiKey,
-      config.rsaPublicKey
+      config.rsaPublicKey || '' as KeyLike // rsaPublicKey not needed for checkout
     );
 
     // Transform public API to internal format
@@ -290,9 +311,9 @@ export async function createABACheckout(
     // Use sandbox by default
     const useSandbox = config.sandbox !== false;
 
-    // Generate checkout response
+    // Generate checkout response with auto-submit enabled
     const checkoutResponse = client.createCheckoutPayment(checkoutData, useSandbox);
-    const htmlForm = client.generateCheckoutForm(checkoutData, useSandbox);
+    const htmlForm = client.generateCheckoutForm(checkoutData, useSandbox, true);
 
     return {
       success: true,

@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import ABAPayWayClient from "aba-payway";
+import { createABACheckout, ABAPayWayConfig, PaymentRequest } from "aba-payway";
 
 const app = express();
 
@@ -19,17 +19,21 @@ app.get("/", (req, res) => {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>ABA PayWay Test</title>
+      <title>ABA PayWay Simplified API Demo</title>
       <style>
         body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
         .link { display: inline-block; padding: 15px 30px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin: 10px; }
         .link:hover { background: #0056b3; }
+        .info { background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 5px; }
       </style>
     </head>
     <body>
-      <h1>ABA PayWay Test Server</h1>
-      <p>Environment: Sandbox | Port: 3000</p>
-      <a href="/test-checkout" class="link">Test Checkout</a>
+      <h1>ABA PayWay Simplified API Demo</h1>
+      <div class="info">
+        <p><strong>Environment:</strong> Sandbox </p>
+        <p>Demonstrating the <code>createABACheckout()</code> function</p>
+      </div>
+      <a href="/test-checkout" class="link">Checkout Demo</a>
     </body>
     </html>
   `);
@@ -37,91 +41,49 @@ app.get("/", (req, res) => {
 
 
 
-// Initialize ABA PayWay client
+// Initialize ABA PayWay configuration
 if (!process.env.ABA_MERCHANT_ID || !process.env.ABA_API_KEY) {
   throw new Error('Missing required environment variables: ABA_MERCHANT_ID and ABA_API_KEY');
 }
 
-const client = new ABAPayWayClient(
-  process.env.ABA_BASE_URL,
-  process.env.ABA_MERCHANT_ID,
-  process.env.ABA_API_KEY,
-  process.env.ABA_RSA_PUBLIC_KEY
-);
+const abaConfig: ABAPayWayConfig = {
+  baseUrl: process.env.ABA_BASE_URL || '',
+  merchantId: process.env.ABA_MERCHANT_ID,
+  apiKey: process.env.ABA_API_KEY,
+  sandbox: true // Use sandbox for testing
+};
 
-// console.log('ABA PayWay initialized:', process.env.ABA_MERCHANT_ID);
+console.log('ABA PayWay configured for merchant:', process.env.ABA_MERCHANT_ID);
 
-// Test checkout endpoint
-app.get("/test-checkout", (req, res) => {
+// Test checkout endpoint using createABACheckout - Auto-submit
+app.get("/test-checkout", async (req, res) => {
   try {
-    const paymentData = {
-      tranId: Date.now().toString(),
+    const paymentRequest: PaymentRequest = {
+      transactionId: Date.now().toString(),
       amount: "10.00",
-      customerInfo: {
-        firstname: "Panhaboth",
-        lastname: "K",
+      customer: {
+        firstName: "Panhaboth",
+        lastName: "K",
         phone: "0123456789",
         email: "panhabothk@outlook.com",
       },
       returnParams: ""
     };
 
-    const checkoutResponse = client.createCheckoutPayment(paymentData, true);
-    const { formData, apiUrl } = checkoutResponse;
+    const result = await createABACheckout(abaConfig, paymentRequest);
 
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>ABA PayWay Checkout</title>
-        <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
-          button { background: #007bff; color: white; padding: 15px 30px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
-          button:hover { background: #0056b3; }
-          #aba_webservice { position: fixed; top: 10%; left: 10%; width: 80%; height: 80%; border: 1px solid #ccc; display: none; z-index: 9999; }
-          .info { background: #f8f9fa; padding: 15px; margin: 20px 0; border-radius: 5px; }
-        </style>
-      </head>
-      <body>
-        <h1>ABA PayWay Checkout</h1>
-        <div class="info">
-          <p><strong>Amount:</strong> $${paymentData.amount}</p>
-          <p><strong>Transaction:</strong> ${paymentData.tranId}</p>
-        </div>
-        
-        <button id="checkout_button">Pay Now</button>
-        <p><a href="/">← Back</a></p>
-        
-        <div style="display: none">
-          <form id="aba_merchant_request" method="POST" target="aba_webservice" action="${apiUrl}">
-            <input type="hidden" name="hash" value="${formData.hash}" />
-            <input type="hidden" name="tran_id" value="${formData.tran_id}" />
-            <input type="hidden" name="amount" value="${formData.amount}" />
-            <input type="hidden" name="firstname" value="${formData.firstname}" />
-            <input type="hidden" name="lastname" value="${formData.lastname}" />
-            <input type="hidden" name="phone" value="${formData.phone}" />
-            <input type="hidden" name="email" value="${formData.email}" />
-            <input type="hidden" name="return_params" value="${formData.return_params}" />
-            <input type="hidden" name="merchant_id" value="${formData.merchant_id}" />
-            <input type="hidden" name="req_time" value="${formData.req_time}" />
-          </form>
-        </div>
-        <iframe id="aba_webservice" name="aba_webservice"></iframe>
-        
-        <script>
-          $("#checkout_button").click(function() {
-            $("#aba_merchant_request").submit();
-            $("#aba_webservice").show();
-          });
-        </script>
-      </body>
-      </html>
-    `);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to create checkout');
+    }
+
+    // createABACheckout handles auto-submit internally
+    res.send(result.htmlForm);
   } catch (error) {
     res.status(500).send(`<h1>Error</h1><p>${error.message}</p><a href="/">← Back</a>`);
   }
 });
+
+
 
 // Payment callbacks
 app.get("/payment-success", (req, res) => {
@@ -133,7 +95,8 @@ app.get("/payment-cancel", (req, res) => {
 });
 
 // API endpoint for creating transactions
-app.post("/create-transaction", (req, res) => {
+// API endpoint demonstrating createABACheckout function
+app.post("/create-transaction", async (req, res) => {
   try {
     const { amount, customerInfo, tranId } = req.body;
 
@@ -146,25 +109,32 @@ app.post("/create-transaction", (req, res) => {
       return res.status(400).json({ error: "Invalid amount" });
     }
 
-    const paymentData = {
-      tranId: tranId || Date.now().toString(),
+    const paymentRequest: PaymentRequest = {
+      transactionId: tranId || Date.now().toString(),
       amount: numAmount.toFixed(2),
-      customerInfo: {
-        firstname: customerInfo.firstname.trim(),
-        lastname: customerInfo.lastname.trim(),
+      customer: {
+        firstName: customerInfo.firstname.trim(),
+        lastName: customerInfo.lastname.trim(),
         phone: customerInfo.phone.trim(),
         email: customerInfo.email.trim(),
       },
       returnParams: ""
     };
 
-    const checkoutResponse = client.createCheckoutPayment(paymentData, true);
+    const result = await createABACheckout(abaConfig, paymentRequest);
+
+    if (!result.success) {
+      return res.status(400).json({
+        error: "Failed to create checkout",
+        message: result.error
+      });
+    }
 
     res.json({
       success: true,
-      transactionId: paymentData.tranId,
-      checkoutResponse,
-      htmlForm: client.generateCheckoutForm(paymentData, true)
+      transactionId: result.transactionId,
+      checkoutUrl: result.checkoutUrl,
+      htmlForm: result.htmlForm
     });
 
   } catch (error) {
