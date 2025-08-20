@@ -56,7 +56,7 @@ const abaConfig: ABAPayWayConfig = {
 console.log('ABA PayWay configured for merchant:', process.env.ABA_MERCHANT_ID);
 
 // Test checkout endpoint using createABACheckout - Auto-submit
-app.get("/test-checkout", async (req, res) => {
+app.get("/test-checkout", (req, res) => {
   try {
     const paymentRequest: PaymentRequest = {
       transactionId: Date.now().toString(),
@@ -70,7 +70,7 @@ app.get("/test-checkout", async (req, res) => {
       returnParams: ""
     };
 
-    const result = await createABACheckout(abaConfig, paymentRequest);
+    const result = createABACheckout(abaConfig, paymentRequest);
 
     if (!result.success) {
       throw new Error(result.error || 'Failed to create checkout');
@@ -96,7 +96,7 @@ app.get("/payment-cancel", (req, res) => {
 
 // API endpoint for creating transactions
 // API endpoint demonstrating createABACheckout function
-app.post("/create-transaction", async (req, res) => {
+app.post("/create-transaction", (req, res) => {
   try {
     const { amount, customerInfo, tranId } = req.body;
 
@@ -121,7 +121,7 @@ app.post("/create-transaction", async (req, res) => {
       returnParams: ""
     };
 
-    const result = await createABACheckout(abaConfig, paymentRequest);
+    const result = createABACheckout(abaConfig, paymentRequest);
 
     if (!result.success) {
       return res.status(400).json({

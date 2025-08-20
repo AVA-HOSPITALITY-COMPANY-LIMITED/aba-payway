@@ -108,7 +108,7 @@ class ABAPayWayClient {
    * @param useSandbox Whether to use sandbox environment (default: true)
    * @returns Checkout response with form data and API URL
    */
-  public createCheckoutPayment(paymentData: CheckoutPaymentData, useSandbox: boolean = true): CheckoutResponse {
+  private createCheckoutPayment(paymentData: CheckoutPaymentData, useSandbox: boolean = true): CheckoutResponse {
     const now = DateTime.now().toUTC().toFormat('yyyyMMddHHmmss');
     const returnParams = paymentData.returnParams || '';
 
@@ -154,7 +154,7 @@ class ABAPayWayClient {
    * @param apiUrl Target API URL for form submission
    * @returns HTML form string with auto-submission enabled
    */
-  public generateCheckoutForm(formData: CheckoutFormData, apiUrl: string): string {
+  private generateCheckoutForm(formData: CheckoutFormData, apiUrl: string): string {
     return `
       <!DOCTYPE html>
       <html>
@@ -189,7 +189,7 @@ class ABAPayWayClient {
     `;
   }
 
-  public createPaymentLink(
+  private createPaymentLink(
     title: string,
     amount: number,
     currency: "KHR" | "USD",
@@ -253,20 +253,35 @@ class ABAPayWayClient {
       .then((result) => console.log(result))
       .catch((error) => console.log("error", error));
   }
+
+  /**
+   * Public method to create checkout payment and generate HTML form
+   * This is the main entry point for external applications
+   * @param paymentData Payment and customer information
+   * @param useSandbox Whether to use sandbox environment (default: true)
+   * @returns Object containing HTML form and checkout URL
+   */
+  public createCheckout(paymentData: CheckoutPaymentData, useSandbox: boolean = true): { htmlForm: string; checkoutUrl: string } {
+    const checkoutResponse = this.createCheckoutPayment(paymentData, useSandbox);
+    const htmlForm = this.generateCheckoutForm(checkoutResponse.formData, checkoutResponse.apiUrl);
+
+    return {
+      htmlForm,
+      checkoutUrl: checkoutResponse.apiUrl
+    };
+  }
 }
 
 /**
- * Creates an ABA PayWay checkout form with a simplified API
- * 
- * @param config - ABA PayWay configuration (baseUrl, merchant ID, API key, RSA public key)
- * @param payment - Payment request details (amount, customer info, transaction ID, returnParams)
- * @returns Promise<PaymentResponse> - Contains HTML form and checkout URL
- * 
- **/
-export async function createABACheckout(
+ * Creates an ABA PayWay checkout form with auto-submission
+ * @param config ABA PayWay configuration
+ * @param payment Payment request details
+ * @returns Payment response with HTML form for checkout
+ */
+export function createABACheckout(
   config: ABAPayWayConfig,
   payment: PaymentRequest
-): Promise<PaymentResponse> {
+): PaymentResponse {
   try {
     // Validate required configuration for checkout
     if (!config.baseUrl || !config.merchantId || !config.apiKey) {
@@ -302,14 +317,13 @@ export async function createABACheckout(
     const useSandbox = config.sandbox !== false;
 
     // Generate checkout response and HTML form
-    const checkoutResponse = client.createCheckoutPayment(checkoutData, useSandbox);
-    const htmlForm = client.generateCheckoutForm(checkoutResponse.formData, checkoutResponse.apiUrl);
+    const checkoutResult = client.createCheckout(checkoutData, useSandbox);
 
     return {
       success: true,
       transactionId: payment.transactionId,
-      htmlForm,
-      checkoutUrl: checkoutResponse.apiUrl
+      htmlForm: checkoutResult.htmlForm,
+      checkoutUrl: checkoutResult.checkoutUrl
     };
   } catch (error) {
     return {
