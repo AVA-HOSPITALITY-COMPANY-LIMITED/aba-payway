@@ -66,30 +66,27 @@ interface CheckoutResponse {
 
 // Internal ABA PayWay client class
 class ABAPayWayClient {
-  private base_url: string;
-  private merchant_id: string;
-  private api_key: string;
-  private rsa_public_key: KeyLike;
+  private readonly baseUrl: string;
+  private readonly merchantId: string;
+  private readonly apiKey: string;
+  private readonly rsaPublicKey?: KeyLike;
+  private readonly sandbox: boolean;
 
   // PayWay checkout API URLs
   public static readonly SANDBOX_CHECKOUT_URL = 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase';
   public static readonly PRODUCTION_CHECKOUT_URL = 'https://checkout.payway.com.kh/api/payment-gateway/v1/payments/purchase';
 
-  constructor(
-    base_url: string,
-    merchant_id: string,
-    api_key: string,
-    rsa_public_key: KeyLike
-  ) {
-    this.base_url = base_url;
-    this.merchant_id = merchant_id;
-    this.api_key = api_key;
-    this.rsa_public_key = rsa_public_key;
+  constructor(config: ABAPayWayConfig) {
+    this.baseUrl = config.baseUrl;
+    this.merchantId = config.merchantId;
+    this.apiKey = config.apiKey;
+    this.rsaPublicKey = config.rsaPublicKey;
+    this.sandbox = config.sandbox !== false; // Default to true
   }
 
   private create_hash(values: string[]) {
     const data = values.join("");
-    return createHmac("sha512", this.api_key).update(data).digest("base64");
+    return createHmac("sha512", this.apiKey).update(data).digest("base64");
   }
 
   /**
@@ -99,7 +96,7 @@ class ABAPayWayClient {
    */
   private createCheckoutHash(values: string[]): string {
     const data = values.join("");
-    const hmac = createHmac('sha512', this.api_key)
+    const hmac = createHmac('sha512', this.apiKey)
       .update(data)
       .digest();
     return Buffer.from(hmac).toString('base64');
@@ -118,7 +115,7 @@ class ABAPayWayClient {
     // Build signature string exactly as PayWay expects
     const signatureValues = [
       now,
-      this.merchant_id,
+      this.merchantId,
       paymentData.tranId,
       paymentData.amount,
       paymentData.customerInfo.firstname,
@@ -139,7 +136,7 @@ class ABAPayWayClient {
       phone: paymentData.customerInfo.phone,
       email: paymentData.customerInfo.email,
       return_params: returnParams,
-      merchant_id: this.merchant_id,
+      merchant_id: this.merchantId,
       req_time: now
     };
 
@@ -153,22 +150,11 @@ class ABAPayWayClient {
 
   /**
    * Generates HTML form string for PayWay checkout
-   * @param paymentData Payment and customer information
-   * @param useSandbox Whether to use sandbox environment (default: true)
-   * @param autoSubmit Whether to auto-submit the form (default: false)
-   * @returns HTML form string ready for submission
+   * @param formData Pre-generated checkout form data
+   * @param apiUrl Target API URL for form submission
+   * @returns HTML form string with auto-submission enabled
    */
-  public generateCheckoutForm(paymentData: CheckoutPaymentData, useSandbox: boolean = true, autoSubmit: boolean = false): string {
-    const checkoutResponse = this.createCheckoutPayment(paymentData, useSandbox);
-    const { formData, apiUrl } = checkoutResponse;
-
-    const autoSubmitScript = autoSubmit ? `
-      <script>
-        document.addEventListener('DOMContentLoaded', function() {
-          document.getElementById('aba_merchant_request').submit();
-        });
-      </script>` : '';
-
+  public generateCheckoutForm(formData: CheckoutFormData, apiUrl: string): string {
     return `
       <!DOCTYPE html>
       <html>
@@ -192,7 +178,12 @@ class ABAPayWayClient {
           <input type="hidden" name="return_params" value="${formData.return_params}" />
           <input type="hidden" name="merchant_id" value="${formData.merchant_id}" />
           <input type="hidden" name="req_time" value="${formData.req_time}" />
-        </form>${autoSubmitScript}
+        </form>
+        <script>
+          document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('aba_merchant_request').submit();
+          });
+        </script>
       </body>
       </html>
     `;
@@ -206,7 +197,7 @@ class ABAPayWayClient {
     options?: {}
   ) {
     const merchant_authObj = {
-      mc_id: this.merchant_id,
+      mc_id: this.merchantId,
       title: title,
       amount: amount,
       currency: currency,
@@ -216,15 +207,19 @@ class ABAPayWayClient {
       return_url: return_url,
     };
 
+    if (!this.rsaPublicKey) {
+      throw new Error('RSA public key is required for payment creation');
+    }
+
     const payload = {
       request_time: DateTime.now().toUTC().toFormat("yyyyMMddHHmmss"),
-      merchant_id: this.merchant_id,
+      merchant_id: this.merchantId,
       merchant_auth: publicEncrypt(
         {
-          key: this.rsa_public_key,
+          key: this.rsaPublicKey,
           padding: constants.RSA_PKCS1_PADDING,
         },
-        JSON.stringify(merchant_authObj).substring(0, 117)
+        Buffer.from(JSON.stringify(merchant_authObj))
       ).toString("base64"),
     };
 
@@ -288,12 +283,7 @@ export async function createABACheckout(
     }
 
     // Create ABA PayWay client instance
-    const client = new ABAPayWayClient(
-      config.baseUrl,
-      config.merchantId,
-      config.apiKey,
-      config.rsaPublicKey || '' as KeyLike // rsaPublicKey not needed for checkout
-    );
+    const client = new ABAPayWayClient(config);
 
     // Transform public API to internal format
     const checkoutData: CheckoutPaymentData = {
@@ -311,9 +301,9 @@ export async function createABACheckout(
     // Use sandbox by default
     const useSandbox = config.sandbox !== false;
 
-    // Generate checkout response with auto-submit enabled
+    // Generate checkout response and HTML form
     const checkoutResponse = client.createCheckoutPayment(checkoutData, useSandbox);
-    const htmlForm = client.generateCheckoutForm(checkoutData, useSandbox, true);
+    const htmlForm = client.generateCheckoutForm(checkoutResponse.formData, checkoutResponse.apiUrl);
 
     return {
       success: true,
