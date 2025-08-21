@@ -47,7 +47,6 @@ if (!process.env.ABA_MERCHANT_ID || !process.env.ABA_API_KEY) {
 }
 
 const abaConfig: ABAPayWayConfig = {
-  baseUrl: process.env.ABA_BASE_URL || '',
   checkoutUrl: process.env.ABA_CHECKOUT_URL,
   merchantId: process.env.ABA_MERCHANT_ID,
   apiKey: process.env.ABA_API_KEY,

@@ -2,7 +2,6 @@ import { createHmac, publicEncrypt, KeyLike, constants } from "crypto";
 import { DateTime } from "luxon";
 
 export interface ABAPayWayConfig {
-  baseUrl: string;
   checkoutUrl: string; // specific URL for checkout API
   merchantId: string;
   apiKey: string;
@@ -66,14 +65,12 @@ interface CheckoutResponse {
 
 // Internal ABA PayWay client class
 class ABAPayWayClient {
-  private readonly baseUrl: string;
   private readonly checkoutUrl: string;
   private readonly merchantId: string;
   private readonly apiKey: string;
   private readonly rsaPublicKey?: KeyLike;
 
   constructor(config: ABAPayWayConfig) {
-    this.baseUrl = config.baseUrl;
     this.checkoutUrl = config.checkoutUrl;
     this.merchantId = config.merchantId;
     this.apiKey = config.apiKey;
@@ -285,8 +282,8 @@ export function createABACheckout(
 ): PaymentResponse {
   try {
     // Validate required configuration for checkout
-    if (!config.baseUrl || !config.checkoutUrl || !config.merchantId || !config.apiKey) {
-      throw new Error('Missing required ABA PayWay configuration: baseUrl, checkoutUrl, merchantId, and apiKey are required');
+    if (!config.checkoutUrl || !config.merchantId || !config.apiKey) {
+      throw new Error('Missing required ABA PayWay configuration: checkoutUrl, merchantId, and apiKey are required');
     }
 
     // Validate payment request

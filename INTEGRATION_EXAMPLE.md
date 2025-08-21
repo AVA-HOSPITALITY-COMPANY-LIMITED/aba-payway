@@ -14,33 +14,27 @@ Create a `.env` file in your project root:
 
 ```bash
 # Backend Configuration (Node.js/Express)
-ABA_BASE_URL=https://checkout-sandbox.payway.com.kh
 ABA_CHECKOUT_URL=https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase
 ABA_MERCHANT_ID=your_merchant_id_here
 ABA_API_KEY=your_api_key_here
 
 # Frontend Configuration (Next.js)
-NEXT_PUBLIC_ABA_BASE_URL=https://checkout-sandbox.payway.com.kh
 NEXT_PUBLIC_ABA_CHECKOUT_URL=https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase
 NEXT_PUBLIC_ABA_MERCHANT_ID=your_merchant_id_here
 NEXT_PUBLIC_ABA_API_KEY=your_api_key_here
 
 # Frontend Configuration (React)
-REACT_APP_ABA_BASE_URL=https://checkout-sandbox.payway.com.kh
 REACT_APP_ABA_CHECKOUT_URL=https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase
 REACT_APP_ABA_MERCHANT_ID=your_merchant_id_here
 REACT_APP_ABA_API_KEY=your_api_key_here
 
 # Frontend Configuration (Vue.js)
-VUE_APP_ABA_BASE_URL=https://checkout-sandbox.payway.com.kh
 VUE_APP_ABA_CHECKOUT_URL=https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase
 VUE_APP_ABA_MERCHANT_ID=your_merchant_id_here
 VUE_APP_ABA_API_KEY=your_api_key_here
 
 # Production URLs (replace sandbox URLs when going live)
 # ABA_CHECKOUT_URL=https://checkout.payway.com.kh/api/payment-gateway/v1/payments/purchase
-# ABA_BASE_URL=https://checkout.payway.com.kh
-
 ```
 
 ## Express Backend Integration
@@ -55,7 +49,6 @@ const app = express();
 app.use(express.json());
 
 const abaConfig: ABAPayWayConfig = {
-  baseUrl: process.env.ABA_BASE_URL,
   checkoutUrl:
     process.env.ABA_CHECKOUT_URL ||
     "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase",
@@ -121,7 +114,6 @@ app.post(
 import { createABACheckout } from "aba-payway";
 
 const abaConfig = {
-  baseUrl: process.env.ABA_BASE_URL,
   checkoutUrl:
     process.env.ABA_CHECKOUT_URL ||
     "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase",
@@ -164,7 +156,6 @@ function CheckoutButton({ amount, transactionId, customer }) {
 
     try {
       const abaConfig = {
-        baseUrl: process.env.REACT_APP_ABA_BASE_URL,
         checkoutUrl:
           process.env.REACT_APP_ABA_CHECKOUT_URL ||
           "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase",
@@ -244,7 +235,6 @@ export default {
 
       try {
         const abaConfig = {
-          baseUrl: process.env.VUE_APP_ABA_BASE_URL || "",
           checkoutUrl:
             process.env.VUE_APP_ABA_CHECKOUT_URL ||
             "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase",
@@ -328,7 +318,6 @@ export default function CheckoutButton({
 
     try {
       const abaConfig = {
-        baseUrl: process.env.NEXT_PUBLIC_ABA_BASE_URL || "",
         checkoutUrl:
           process.env.NEXT_PUBLIC_ABA_CHECKOUT_URL ||
           "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase",
