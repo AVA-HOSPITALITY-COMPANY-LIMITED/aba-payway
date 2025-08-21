@@ -1,6 +1,6 @@
 # ABA PayWay
 
-[![npm version](https://badge.fury.io/js/aba-payway.svg)](https://badge.fury.io/js/aba-payway)
+[![npm version](https://badge.fury.io/js/aba-payway.svg)]
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A simple, TypeScript-first Node.js library for integrating with the ABA PayWay payment gateway.
@@ -56,6 +56,10 @@ Create a `.env` file:
 ABA_BASE_URL=https://checkout-sandbox.payway.com.kh
 ABA_MERCHANT_ID=your_merchant_id_here
 ABA_API_KEY=your_api_key_here
+
+# Optional: Override default API URLs
+ABA_SANDBOX_CHECKOUT_URL=https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase
+ABA_PRODUCTION_CHECKOUT_URL=https://checkout.payway.com.kh/api/payment-gateway/v1/payments/purchase
 ```
 
 ## 📖 API Reference

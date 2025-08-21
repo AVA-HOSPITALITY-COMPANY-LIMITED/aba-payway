@@ -421,6 +421,10 @@ ABA_BASE_URL=https://checkout-sandbox.payway.com.kh
 ABA_MERCHANT_ID=your_merchant_id_here
 ABA_API_KEY=your_api_key_here
 
+# Optional: Override default API URLs
+ABA_SANDBOX_CHECKOUT_URL=https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase
+ABA_PRODUCTION_CHECKOUT_URL=https://checkout.payway.com.kh/api/payment-gateway/v1/payments/purchase
+
 # For Next.js frontend access
 NEXT_PUBLIC_BASE_URL=https://yoursite.com
 

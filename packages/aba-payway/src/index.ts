@@ -72,9 +72,7 @@ class ABAPayWayClient {
   private readonly rsaPublicKey?: KeyLike;
   private readonly sandbox: boolean;
 
-  // PayWay checkout API URLs
-  public static readonly SANDBOX_CHECKOUT_URL = 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase';
-  public static readonly PRODUCTION_CHECKOUT_URL = 'https://checkout.payway.com.kh/api/payment-gateway/v1/payments/purchase';
+
 
   constructor(config: ABAPayWayConfig) {
     this.baseUrl = config.baseUrl;
@@ -100,6 +98,56 @@ class ABAPayWayClient {
       .update(data)
       .digest();
     return Buffer.from(hmac).toString('base64');
+  }
+
+  /**
+   * Gets the appropriate checkout API URL based on configuration
+   * Priority: 1) Environment variables, 2) baseUrl from config, 3) default URLs
+   * @param useSandbox Whether to use sandbox environment
+   * @returns The complete API URL for checkout
+   */
+  private getCheckoutApiUrl(useSandbox: boolean): string {
+    // Check environment variables first
+    const envUrl = useSandbox 
+      ? process.env.ABA_SANDBOX_CHECKOUT_URL 
+      : process.env.ABA_PRODUCTION_CHECKOUT_URL;
+    
+    if (envUrl) {
+      return envUrl;
+    }
+    
+    // If baseUrl is provided and looks like a complete URL, use it directly
+    if (this.baseUrl && (this.baseUrl.startsWith('http://') || this.baseUrl.startsWith('https://'))) {
+      // Remove trailing slash if present
+      const cleanBaseUrl = this.baseUrl.replace(/\/$/, '');
+      
+      // If baseUrl already contains the full path, use it as-is
+      if (cleanBaseUrl.includes('/api/payment-gateway/')) {
+        return cleanBaseUrl;
+      }
+      
+      // Otherwise, append the standard API path
+      return `${cleanBaseUrl}/api/payment-gateway/v1/payments/purchase`;
+    }
+    
+    // If baseUrl is a domain without protocol, construct the URL
+    if (this.baseUrl && !this.baseUrl.startsWith('http')) {
+      const protocol = 'https'; // Always use HTTPS for security
+      const cleanBaseUrl = this.baseUrl.replace(/\/$/, '');
+      
+      // If baseUrl already contains the full path, use it with protocol
+      if (cleanBaseUrl.includes('/api/payment-gateway/')) {
+        return `${protocol}://${cleanBaseUrl}`;
+      }
+      
+      // Otherwise, append the standard API path
+      return `${protocol}://${cleanBaseUrl}/api/payment-gateway/v1/payments/purchase`;
+    }
+    
+    // Fallback to default URLs if baseUrl is not provided or invalid
+    return useSandbox 
+      ? 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase'
+      : 'https://checkout.payway.com.kh/api/payment-gateway/v1/payments/purchase';
   }
 
   /**
@@ -140,7 +188,7 @@ class ABAPayWayClient {
       req_time: now
     };
 
-    const apiUrl = useSandbox ? ABAPayWayClient.SANDBOX_CHECKOUT_URL : ABAPayWayClient.PRODUCTION_CHECKOUT_URL;
+    const apiUrl = this.getCheckoutApiUrl(useSandbox);
 
     return {
       formData,
