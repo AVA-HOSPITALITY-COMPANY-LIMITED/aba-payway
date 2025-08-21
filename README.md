@@ -26,26 +26,38 @@ import { createABACheckout } from 'aba-payway';
 
 // 1. Configure your merchant details
 const abaConfig = {
-  baseUrl: process.env.ABA_BASE_URL || '',
+  baseUrl: process.env.ABA_BASE_URL, // API endpoints
+  checkoutUrl: process.env.ABA_CHECKOUT_URL || 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase',
   merchantId: process.env.ABA_MERCHANT_ID,
-  apiKey: process.env.ABA_API_KEY,
-  sandbox: true // Use sandbox for testing
+  apiKey: process.env.ABA_API_KEY
 };
 
 // 2. Create payment request
 const paymentRequest = {
-  amount: 10.50,
-  orderId: 'ORDER_001',
-  currency: 'USD',
-  returnUrl: 'https://yoursite.com/success',
-  cancelUrl: 'https://yoursite.com/cancel'
+  transactionId: 'TXN_001',
+  amount: '10.50',
+  customer: {
+    firstName: 'John',
+    lastName: 'Doe',
+    email: 'john@example.com',
+    phone: '+855123456789'
+  },
+  returnParams: 'order_id=123&user_id=456'
 };
 
 // 3. Generate checkout (synchronous - no await needed!)
 const payment = createABACheckout(abaConfig, paymentRequest);
 
-// 4. Redirect user to payment page
-window.location.href = payment.checkoutUrl;
+// 4. Use the HTML form or redirect to checkout URL
+if (payment.success) {
+  // Option 1: Use auto-submit HTML form
+  document.body.innerHTML = payment.htmlForm;
+  
+  // Option 2: Or redirect directly
+  window.location.href = payment.checkoutUrl;
+} else {
+  console.error('Payment creation failed:', payment.error);
+}
 ```
 
 ## 🔧 Environment Setup
@@ -53,36 +65,42 @@ window.location.href = payment.checkoutUrl;
 Create a `.env` file:
 
 ```bash
-ABA_BASE_URL=https://checkout-sandbox.payway.com.kh
+ABA_BASE_URL=https://api.payway.com.kh  # For other API endpoints (webhooks, etc.)
+ABA_CHECKOUT_URL=https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase  # For sandbox
+# ABA_CHECKOUT_URL=https://checkout.payway.com.kh/api/payment-gateway/v1/payments/purchase  # For production
 ABA_MERCHANT_ID=your_merchant_id_here
 ABA_API_KEY=your_api_key_here
-
-# Optional: Override default API URLs
-ABA_SANDBOX_CHECKOUT_URL=https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase
-ABA_PRODUCTION_CHECKOUT_URL=https://checkout.payway.com.kh/api/payment-gateway/v1/payments/purchase
 ```
+
+
 
 ## 📖 API Reference
 
 ### `createABACheckout(config, paymentRequest)`
 
 **Parameters:**
-- `config.baseUrl` - ABA PayWay API base URL
+
+- `config.baseUrl` - ABA PayWay API base URL (for webhooks, payment links, etc.)
+- `config.checkoutUrl` - **Required** - Checkout API endpoint URL
 - `config.merchantId` - Your ABA PayWay merchant ID
 - `config.apiKey` - Your ABA PayWay API key
-- `config.sandbox` - Enable sandbox mode for testing
-- `paymentRequest.amount` - Payment amount (number)
-- `paymentRequest.orderId` - Unique order ID (string)
-- `paymentRequest.currency` - Currency code ('USD', 'KHR')
-- `paymentRequest.returnUrl` - Success redirect URL
-- `paymentRequest.cancelUrl` - Cancel redirect URL
+- `paymentRequest.transactionId` - Unique transaction ID (string)
+- `paymentRequest.amount` - Payment amount (string)
+- `paymentRequest.customer` - Customer information object
+- `paymentRequest.customer.firstName` - Customer first name
+- `paymentRequest.customer.lastName` - Customer last name
+- `paymentRequest.customer.email` - Customer email
+- `paymentRequest.customer.phone` - Customer phone number
+- `paymentRequest.returnParams` - Optional return parameters
 
 **Returns:**
+
+- `success` - Boolean indicating if checkout creation was successful
 - `checkoutUrl` - Direct payment URL for user redirection
-- `form` - HTML form for embedding payment page
-- `orderId` - Order ID from request
+- `htmlForm` - Auto-submit HTML form for seamless checkout
+- `transactionId` - Transaction ID from request
 - `amount` - Payment amount
-- `currency` - Payment currency
+- `error` - Error message if creation failed
 
 ## 🛠️ Framework Integration
 
@@ -98,24 +116,31 @@ For detailed examples with specific frameworks:
 ## ⚡ TypeScript Support
 
 ```typescript
-import { createABACheckout, ABAPayWayConfig, PaymentRequest } from 'aba-payway';
+import { createABACheckout, ABAPayWayConfig, PaymentRequest } from "aba-payway";
 
 const abaConfig: ABAPayWayConfig = {
-  baseUrl: process.env.ABA_BASE_URL || '',
+  baseUrl: process.env.ABA_BASE_URL || "",
+  checkoutUrl: process.env.ABA_CHECKOUT_URL || "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase",
   merchantId: process.env.ABA_MERCHANT_ID!,
-  apiKey: process.env.ABA_API_KEY!,
-  sandbox: true
+  apiKey: process.env.ABA_API_KEY!
 };
 
 const request: PaymentRequest = {
-  amount: 25.99,
-  orderId: `ORDER_${Date.now()}`,
-  currency: 'USD',
-  returnUrl: 'https://mystore.com/success',
-  cancelUrl: 'https://mystore.com/cancel'
+  transactionId: `TXN_${Date.now()}`,
+  amount: "25.99",
+  customer: {
+    firstName: "John",
+    lastName: "Doe",
+    email: "john@example.com",
+    phone: "+855123456789"
+  },
+  returnParams: "order_id=123"
 };
 
 const payment = createABACheckout(abaConfig, request);
+if (payment.success) {
+  // Use payment.checkoutUrl or payment.htmlForm
+}
 ```
 
 ## 🔒 Security Best Practices

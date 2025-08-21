@@ -8,122 +8,109 @@ This guide shows you how to integrate the ABA PayWay library into both backend (
 npm install aba-payway
 ```
 
-## Express Backend Integration
+## Environment Variables Setup
 
-### Basic Express Setup
+Create a `.env` file in your project root:
 
-```javascript
-const express = require('express');
-const { createABACheckout } = require('aba-payway');
+```bash
+# Backend Configuration (Node.js/Express)
+ABA_BASE_URL=https://checkout-sandbox.payway.com.kh
+ABA_CHECKOUT_URL=https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase
+ABA_MERCHANT_ID=your_merchant_id_here
+ABA_API_KEY=your_api_key_here
 
-const app = express();
-app.use(express.json());
+# Frontend Configuration (Next.js)
+NEXT_PUBLIC_ABA_BASE_URL=https://checkout-sandbox.payway.com.kh
+NEXT_PUBLIC_ABA_CHECKOUT_URL=https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase
+NEXT_PUBLIC_ABA_MERCHANT_ID=your_merchant_id_here
+NEXT_PUBLIC_ABA_API_KEY=your_api_key_here
 
-const abaConfig = {
-  baseUrl: process.env.ABA_BASE_URL || '',
-  merchantId: process.env.ABA_MERCHANT_ID,
-  apiKey: process.env.ABA_API_KEY,
-  sandbox: true // Use sandbox for testing
-};
+# Frontend Configuration (React)
+REACT_APP_ABA_BASE_URL=https://checkout-sandbox.payway.com.kh
+REACT_APP_ABA_CHECKOUT_URL=https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase
+REACT_APP_ABA_MERCHANT_ID=your_merchant_id_here
+REACT_APP_ABA_API_KEY=your_api_key_here
 
-// Create payment endpoint
-app.post('/create-payment', (req, res) => {
-  try {
-    const { amount, orderId, currency = 'USD' } = req.body;
-    
-    const paymentRequest = {
-      amount,
-      orderId,
-      currency,
-      returnUrl: 'https://yoursite.com/payment/success',
-      cancelUrl: 'https://yoursite.com/payment/cancel'
-    };
+# Frontend Configuration (Vue.js)
+VUE_APP_ABA_BASE_URL=https://checkout-sandbox.payway.com.kh
+VUE_APP_ABA_CHECKOUT_URL=https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase
+VUE_APP_ABA_MERCHANT_ID=your_merchant_id_here
+VUE_APP_ABA_API_KEY=your_api_key_here
 
+# Production URLs (replace sandbox URLs when going live)
+# ABA_CHECKOUT_URL=https://checkout.payway.com.kh/api/payment-gateway/v1/payments/purchase
+# ABA_BASE_URL=https://checkout.payway.com.kh
 
-    const paymentResponse = createABACheckout(abaConfig, paymentRequest);
-    
-    res.json({
-      success: true,
-      checkoutUrl: paymentResponse.checkoutUrl,
-      orderId: paymentResponse.orderId
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// Test endpoint to generate payment form
-app.get('/test-payment', (req, res) => {
-  const paymentRequest = {
-    amount: 10.50,
-    orderId: `ORDER_${Date.now()}`,
-    currency: 'USD',
-    returnUrl: 'https://yoursite.com/payment/success',
-    cancelUrl: 'https://yoursite.com/payment/cancel'
-  };
-
-  const paymentResponse = createABACheckout(abaConfig, paymentRequest);
-  
-  // Send HTML form directly to browser
-  res.send(paymentResponse.form);
-});
-
-app.listen(3000, () => {
-  console.log('Server running on http://localhost:3000');
-});
 ```
+
+## Express Backend Integration
 
 ### Express with TypeScript
 
 ```typescript
-import express, { Request, Response } from 'express';
-import { createABACheckout, ABAPayWayConfig, PaymentRequest } from 'aba-payway';
+import express, { Request, Response } from "express";
+import { createABACheckout, ABAPayWayConfig, PaymentRequest } from "aba-payway";
 
 const app = express();
 app.use(express.json());
 
 const abaConfig: ABAPayWayConfig = {
-  baseUrl: process.env.ABA_BASE_URL || '',
+  baseUrl: process.env.ABA_BASE_URL,
+  checkoutUrl:
+    process.env.ABA_CHECKOUT_URL ||
+    "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase",
   merchantId: process.env.ABA_MERCHANT_ID!,
   apiKey: process.env.ABA_API_KEY!,
-  sandbox: true
 };
 
 interface CreatePaymentBody {
-  amount: number;
-  orderId: string;
-  currency?: string;
+  amount: string;
+  transactionId: string;
+  customer: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+  };
+  returnParams?: string;
 }
 
-app.post('/create-payment', (req: Request<{}, {}, CreatePaymentBody>, res: Response) => {
-  try {
-    const { amount, orderId, currency = 'USD' } = req.body;
-    
-    const paymentRequest: PaymentRequest = {
-      amount,
-      orderId,
-      currency,
-      returnUrl: 'https://yoursite.com/payment/success',
-      cancelUrl: 'https://yoursite.com/payment/cancel'
-    };
+app.post(
+  "/create-payment",
+  (req: Request<{}, {}, CreatePaymentBody>, res: Response) => {
+    try {
+      const { amount, transactionId, customer, returnParams } = req.body;
 
-    const paymentResponse = createABACheckout(abaConfig, paymentRequest);
-    
-    res.json({
-      success: true,
-      checkoutUrl: paymentResponse.checkoutUrl,
-      orderId: paymentResponse.orderId
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
+      const paymentRequest: PaymentRequest = {
+        transactionId,
+        amount,
+        customer,
+        returnParams,
+      };
+
+      const paymentResponse = createABACheckout(abaConfig, paymentRequest);
+
+      if (paymentResponse.success) {
+        res.json({
+          success: true,
+          checkoutUrl: paymentResponse.checkoutUrl,
+          htmlForm: paymentResponse.htmlForm,
+          transactionId: paymentResponse.transactionId,
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: paymentResponse.error,
+        });
+      }
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
   }
-});
+);
 ```
 
 ## Frontend Integration
@@ -131,25 +118,34 @@ app.post('/create-payment', (req: Request<{}, {}, CreatePaymentBody>, res: Respo
 ### Basic Usage
 
 ```javascript
-import { createABACheckout } from 'aba-payway';
+import { createABACheckout } from "aba-payway";
 
 const abaConfig = {
-  baseUrl: process.env.ABA_BASE_URL || '',
+  baseUrl: process.env.ABA_BASE_URL,
+  checkoutUrl:
+    process.env.ABA_CHECKOUT_URL ||
+    "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase",
   merchantId: process.env.ABA_MERCHANT_ID,
   apiKey: process.env.ABA_API_KEY,
-  sandbox: true // Use sandbox for testing
 };
 
 const paymentRequest = {
-  amount: 10.50,
-  orderId: 'ORDER_001',
-  currency: 'USD',
-  returnUrl: 'https://yoursite.com/payment/success',
-  cancelUrl: 'https://yoursite.com/payment/cancel'
+  transactionId: "TXN_001",
+  amount: "10.50",
+  customer: {
+    firstName: "John",
+    lastName: "Doe",
+    email: "john@example.com",
+    phone: "+855123456789",
+  },
+  returnParams: "order_id=123",
 };
 
 const paymentResponse = createABACheckout(abaConfig, paymentRequest);
-console.log(paymentResponse.checkoutUrl); // Direct access to checkout URL
+if (paymentResponse.success) {
+  console.log(paymentResponse.checkoutUrl); // Direct access to checkout URL
+  // Or use the HTML form: document.body.innerHTML = paymentResponse.htmlForm;
+}
 ```
 
 ## Frontend Integration Examples
@@ -157,38 +153,47 @@ console.log(paymentResponse.checkoutUrl); // Direct access to checkout URL
 ### 1. React Component
 
 ```jsx
-import React, { useState } from 'react';
-import { createABACheckout } from 'aba-payway';
+import React, { useState } from "react";
+import { createABACheckout } from "aba-payway";
 
-function CheckoutButton({ amount, orderId }) {
+function CheckoutButton({ amount, transactionId, customer }) {
   const [loading, setLoading] = useState(false);
 
   const handleCheckout = () => {
     setLoading(true);
-    
+
     try {
       const abaConfig = {
-        baseUrl: process.env.REACT_APP_ABA_BASE_URL || '',
+        baseUrl: process.env.REACT_APP_ABA_BASE_URL,
+        checkoutUrl:
+          process.env.REACT_APP_ABA_CHECKOUT_URL ||
+          "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase",
         merchantId: process.env.REACT_APP_ABA_MERCHANT_ID,
         apiKey: process.env.REACT_APP_ABA_API_KEY,
-        sandbox: true
       };
 
       const paymentRequest = {
-        amount: amount,
-        orderId: orderId || `ORDER_${Date.now()}`,
-        currency: 'USD',
-        returnUrl: `${window.location.origin}/payment/success`,
-        cancelUrl: `${window.location.origin}/payment/cancel`
+        transactionId: transactionId || `TXN_${Date.now()}`,
+        amount: amount.toString(),
+        customer,
+        returnParams: `return_url=${encodeURIComponent(
+          window.location.origin + "/payment/success"
+        )}`,
       };
 
       const paymentResponse = createABACheckout(abaConfig, paymentRequest);
-      
-      // Redirect to checkout page
-      window.location.href = paymentResponse.checkoutUrl;
-      
+
+      if (paymentResponse.success) {
+        // Option 1: Redirect to checkout page
+        window.location.href = paymentResponse.checkoutUrl;
+
+        // Option 2: Use auto-submit form (uncomment to use)
+        // document.body.innerHTML = paymentResponse.htmlForm;
+      } else {
+        alert("Payment Error: " + paymentResponse.error);
+      }
     } catch (error) {
-      alert('Payment Error: ' + error.message);
+      alert("Payment Error: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -196,13 +201,22 @@ function CheckoutButton({ amount, orderId }) {
 
   return (
     <button onClick={handleCheckout} disabled={loading}>
-      {loading ? 'Processing...' : `Pay $${amount}`}
+      {loading ? "Processing..." : `Pay $${amount}`}
     </button>
   );
 }
 
 // Usage
-<CheckoutButton amount={25.99} orderId="ORDER_123" />
+<CheckoutButton
+  amount={25.99}
+  transactionId="TXN_123"
+  customer={{
+    firstName: "John",
+    lastName: "Doe",
+    email: "john@example.com",
+    phone: "+855123456789",
+  }}
+/>;
 ```
 
 ### 2. Vue.js Component
@@ -210,196 +224,169 @@ function CheckoutButton({ amount, orderId }) {
 ```vue
 <template>
   <button @click="handleCheckout" :disabled="loading">
-    {{ loading ? 'Processing...' : `Pay $${amount}` }}
+    {{ loading ? "Processing..." : `Pay $${amount}` }}
   </button>
 </template>
 
 <script>
-import { createABACheckout } from 'aba-payway';
+import { createABACheckout } from "aba-payway";
 
 export default {
-  props: ['amount', 'orderId'],
+  props: ["amount", "transactionId", "customer"],
   data() {
     return {
-      loading: false
+      loading: false,
     };
   },
   methods: {
     handleCheckout() {
       this.loading = true;
-      
+
       try {
         const abaConfig = {
-          baseUrl: process.env.VUE_APP_ABA_BASE_URL || '',
+          baseUrl: process.env.VUE_APP_ABA_BASE_URL || "",
+          checkoutUrl:
+            process.env.VUE_APP_ABA_CHECKOUT_URL ||
+            "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase",
           merchantId: process.env.VUE_APP_ABA_MERCHANT_ID,
           apiKey: process.env.VUE_APP_ABA_API_KEY,
-          sandbox: true
         };
 
         const paymentRequest = {
-          amount: this.amount,
-          orderId: this.orderId || `ORDER_${Date.now()}`,
-          currency: 'USD',
-          returnUrl: `${window.location.origin}/payment/success`,
-          cancelUrl: `${window.location.origin}/payment/cancel`
+          transactionId: this.transactionId || `TXN_${Date.now()}`,
+          amount: this.amount.toString(),
+          customer: this.customer,
+          returnParams: `return_url=${encodeURIComponent(
+            window.location.origin + "/payment/success"
+          )}`,
         };
-     
+
         const paymentResponse = createABACheckout(abaConfig, paymentRequest);
-        
-        // Redirect to checkout page
-        window.location.href = paymentResponse.checkoutUrl;
-        
+
+        if (paymentResponse.success) {
+          // Option 1: Redirect to checkout page
+          window.location.href = paymentResponse.checkoutUrl;
+
+          // Option 2: Use auto-submit form (uncomment to use)
+          // document.body.innerHTML = paymentResponse.htmlForm;
+        } else {
+          alert("Payment Error: " + paymentResponse.error);
+        }
       } catch (error) {
-        alert('Payment Error: ' + error.message);
+        alert("Payment Error: " + error.message);
       } finally {
         this.loading = false;
       }
-    }
-  }
+    },
+  },
 };
 </script>
 
 <!-- Usage -->
-<!-- <CheckoutButton :amount="25.99" orderId="ORDER_123" /> -->
+<!-- 
+<CheckoutButton 
+  :amount="25.99" 
+  transactionId="TXN_123"
+  :customer="{
+    firstName: 'John',
+    lastName: 'Doe',
+    email: 'john@example.com',
+    phone: '+855123456789'
+  }"
+/> 
+-->
 ```
 
-### 3. Vanilla JavaScript
+### 3. Next.js Component
 
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <title>ABA PayWay Checkout</title>
-</head>
-<body>
-    <button id="payButton">Pay $25.00</button>
-    
-    <script type="module">
-        import { createABACheckout } from 'aba-payway';
-        
-        document.getElementById('payButton').addEventListener('click', () => {
-            try {
-                const abaConfig = {
-                    baseUrl: process.env.ABA_BASE_URL || '',
-                    merchantId: process.env.ABA_MERCHANT_ID,
-                    apiKey: process.env.ABA_API_KEY,
-                    sandbox: true
-                };
+```tsx
+"use client";
 
-                const paymentRequest = {
-                    amount: 25.00,
-                    orderId: `ORDER_${Date.now()}`,
-                    currency: 'USD',
-                    returnUrl: `${window.location.origin}/payment/success`,
-                    cancelUrl: `${window.location.origin}/payment/cancel`
-                };
-        
-                const paymentResponse = createABACheckout(abaConfig, paymentRequest);
-                
-                // Redirect to checkout page
-                window.location.href = paymentResponse.checkoutUrl;
-                
-            } catch (error) {
-                alert('Payment Error: ' + error.message);
-            }
-        });
-    </script>
-</body>
-</html>
-```
+import { useState } from "react";
+import { createABACheckout } from "aba-payway";
 
-### 4. Next.js API Route + Frontend
-
-**API Route (`app/api/checkout/route.js`):**
-```javascript
-import { createABACheckout } from 'aba-payway';
-import { NextResponse } from 'next/server';
-
-export async function POST(request) {
-  try {
-    const { amount, orderId, currency = 'USD' } = await request.json();
-
-    const abaConfig = {
-      baseUrl: process.env.ABA_BASE_URL || '',
-      merchantId: process.env.ABA_MERCHANT_ID,
-      apiKey: process.env.ABA_API_KEY,
-      sandbox: true
-    };
-
-    const paymentRequest = {
-      amount,
-      orderId: orderId || `ORDER_${Date.now()}`,
-      currency,
-      returnUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/success`,
-      cancelUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/payment/cancel`
-    };
-
-    const paymentResponse = createABACheckout(abaConfig, paymentRequest);
-    
-    return NextResponse.json({
-      success: true,
-      checkoutUrl: paymentResponse.checkoutUrl,
-      orderId: paymentResponse.orderId
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 400 }
-    );
-  }
+interface CheckoutButtonProps {
+  amount: number;
+  transactionId?: string;
+  customer: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+  };
 }
-```
 
-**Frontend Component:**
-```jsx
-'use client';
-
-import { useState } from 'react';
-
-function CheckoutForm() {
+export default function CheckoutButton({
+  amount,
+  transactionId,
+  customer,
+}: CheckoutButtonProps) {
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleCheckout = () => {
     setLoading(true);
-    
+
     try {
-      const formData = new FormData(e.target);
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: parseFloat(formData.get('amount')),
-          orderId: formData.get('orderId'),
-          currency: 'USD'
-        })
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        // Redirect to checkout page
-        window.location.href = result.checkoutUrl;
+      const abaConfig = {
+        baseUrl: process.env.NEXT_PUBLIC_ABA_BASE_URL || "",
+        checkoutUrl:
+          process.env.NEXT_PUBLIC_ABA_CHECKOUT_URL ||
+          "https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase",
+        merchantId: process.env.NEXT_PUBLIC_ABA_MERCHANT_ID!,
+        apiKey: process.env.NEXT_PUBLIC_ABA_API_KEY!,
+      };
+
+      const paymentRequest = {
+        transactionId: transactionId || `TXN_${Date.now()}`,
+        amount: amount.toString(),
+        customer,
+        returnParams: `return_url=${encodeURIComponent(
+          window.location.origin + "/payment/success"
+        )}`,
+      };
+
+      const paymentResponse = createABACheckout(abaConfig, paymentRequest);
+
+      if (paymentResponse.success) {
+        // Option 1: Redirect to checkout page
+        window.location.href = paymentResponse.checkoutUrl;
+
+        // Option 2: Use auto-submit form (uncomment to use)
+        // const formContainer = document.createElement('div');
+        // formContainer.innerHTML = paymentResponse.htmlForm;
+        // document.body.appendChild(formContainer);
       } else {
-        alert('Error: ' + result.error);
+        alert("Payment Error: " + paymentResponse.error);
       }
     } catch (error) {
-      alert('Payment Error: ' + error.message);
+      alert("Payment Error: " + (error as Error).message);
     } finally {
       setLoading(false);
     }
   };
-  
+
   return (
-    <form onSubmit={handleSubmit}>
-      <input name="amount" type="number" step="0.01" placeholder="Amount" required />
-      <input name="orderId" type="text" placeholder="Order ID (optional)" />
-      <button type="submit" disabled={loading}>
-        {loading ? 'Processing...' : 'Pay Now'}
-      </button>
-    </form>
+    <button
+      onClick={handleCheckout}
+      disabled={loading}
+      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+    >
+      {loading ? "Processing..." : `Pay $${amount}`}
+    </button>
   );
 }
+
+// Usage in a page or component:
+// <CheckoutButton
+//   amount={25.99}
+//   transactionId="TXN_123"
+//   customer={{
+//     firstName: 'John',
+//     lastName: 'Doe',
+//     email: 'john@example.com',
+//     phone: '+855123456789'
+//   }}
+// />
 ```
 
 ## Key Benefits
@@ -409,77 +396,4 @@ function CheckoutForm() {
 ✅ **Universal** - Works in Node.js, React, Vue, vanilla JS, and more  
 ✅ **Type-safe** - Full TypeScript support with proper interfaces  
 ✅ **Error handling** - Built-in validation and clear error messages  
-✅ **Lightweight** - Minimal dependencies, small bundle size  
-
-## Environment Variables Setup
-
-Create a `.env` file in your project root:
-
-```bash
-# ABA PayWay Configuration
-ABA_BASE_URL=https://checkout-sandbox.payway.com.kh
-ABA_MERCHANT_ID=your_merchant_id_here
-ABA_API_KEY=your_api_key_here
-
-# Optional: Override default API URLs
-ABA_SANDBOX_CHECKOUT_URL=https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase
-ABA_PRODUCTION_CHECKOUT_URL=https://checkout.payway.com.kh/api/payment-gateway/v1/payments/purchase
-
-# For Next.js frontend access
-NEXT_PUBLIC_BASE_URL=https://yoursite.com
-
-# For React apps
-REACT_APP_ABA_BASE_URL=https://checkout-sandbox.payway.com.kh
-REACT_APP_ABA_MERCHANT_ID=your_merchant_id_here
-REACT_APP_ABA_API_KEY=your_api_key_here
-
-# For Vue apps
-VUE_APP_ABA_BASE_URL=https://checkout-sandbox.payway.com.kh
-VUE_APP_ABA_MERCHANT_ID=your_merchant_id_here
-VUE_APP_ABA_API_KEY=your_api_key_here
-```
-
-## Security Best Practices
-
-🔒 **Backend Integration (Recommended)**
-- Keep API keys on the server side only
-- Validate all payments on your backend
-- Never expose sensitive credentials in frontend code
-- Use HTTPS for all payment-related endpoints
-
-🔒 **Frontend Integration**
-- Only use for development/testing purposes
-- Store credentials in environment variables
-- Implement proper input validation
-- Use CORS policies appropriately
-
-## Return URLs Setup
-
-Configure these URLs in your ABA PayWay merchant dashboard:
-
-```bash
-# Success URL - where users go after successful payment
-https://yoursite.com/payment/success
-
-# Cancel URL - where users go if they cancel payment
-https://yoursite.com/payment/cancel
-
-# Callback URL - for server-to-server payment notifications
-https://yoursite.com/api/payment/callback
-```
-
-## Testing
-
-For development and testing:
-
-1. Use sandbox credentials from ABA PayWay
-2. Test with small amounts (e.g., $0.01)
-3. Verify return URL handling
-4. Test error scenarios (invalid amounts, missing fields)
-
-## Need Help?
-
-- Check the [ABA PayWay documentation](https://payway.ababank.com)
-- Review the example server in this repository
-- Ensure your merchant account is properly configured
-- Verify your API credentials are correct
+✅ **Lightweight** - Minimal dependencies, small bundle size
