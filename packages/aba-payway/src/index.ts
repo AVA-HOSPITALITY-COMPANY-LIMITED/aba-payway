@@ -3,10 +3,10 @@ import { DateTime } from "luxon";
 
 export interface ABAPayWayConfig {
   baseUrl: string;
+  checkoutUrl: string; // specific URL for checkout API
   merchantId: string;
   apiKey: string;
   rsaPublicKey?: KeyLike; // Optional - only required for payment link creation
-  sandbox?: boolean; // defaults to true
 }
 
 export interface PaymentRequest {
@@ -67,19 +67,17 @@ interface CheckoutResponse {
 // Internal ABA PayWay client class
 class ABAPayWayClient {
   private readonly baseUrl: string;
+  private readonly checkoutUrl: string;
   private readonly merchantId: string;
   private readonly apiKey: string;
   private readonly rsaPublicKey?: KeyLike;
-  private readonly sandbox: boolean;
-
-
 
   constructor(config: ABAPayWayConfig) {
     this.baseUrl = config.baseUrl;
+    this.checkoutUrl = config.checkoutUrl;
     this.merchantId = config.merchantId;
     this.apiKey = config.apiKey;
     this.rsaPublicKey = config.rsaPublicKey;
-    this.sandbox = config.sandbox !== false; // Default to true
   }
 
   private create_hash(values: string[]) {
@@ -106,57 +104,14 @@ class ABAPayWayClient {
    * @param useSandbox Whether to use sandbox environment
    * @returns The complete API URL for checkout
    */
-  private getCheckoutApiUrl(useSandbox: boolean): string {
-    // Check environment variables first
-    const envUrl = useSandbox 
-      ? process.env.ABA_SANDBOX_CHECKOUT_URL 
-      : process.env.ABA_PRODUCTION_CHECKOUT_URL;
-    
-    if (envUrl) {
-      return envUrl;
-    }
-    
-    // If baseUrl is provided and looks like a complete URL, use it directly
-    if (this.baseUrl && (this.baseUrl.startsWith('http://') || this.baseUrl.startsWith('https://'))) {
-      // Remove trailing slash if present
-      const cleanBaseUrl = this.baseUrl.replace(/\/$/, '');
-      
-      // If baseUrl already contains the full path, use it as-is
-      if (cleanBaseUrl.includes('/api/payment-gateway/')) {
-        return cleanBaseUrl;
-      }
-      
-      // Otherwise, append the standard API path
-      return `${cleanBaseUrl}/api/payment-gateway/v1/payments/purchase`;
-    }
-    
-    // If baseUrl is a domain without protocol, construct the URL
-    if (this.baseUrl && !this.baseUrl.startsWith('http')) {
-      const protocol = 'https'; // Always use HTTPS for security
-      const cleanBaseUrl = this.baseUrl.replace(/\/$/, '');
-      
-      // If baseUrl already contains the full path, use it with protocol
-      if (cleanBaseUrl.includes('/api/payment-gateway/')) {
-        return `${protocol}://${cleanBaseUrl}`;
-      }
-      
-      // Otherwise, append the standard API path
-      return `${protocol}://${cleanBaseUrl}/api/payment-gateway/v1/payments/purchase`;
-    }
-    
-    // Fallback to default URLs if baseUrl is not provided or invalid
-    return useSandbox 
-      ? 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase'
-      : 'https://checkout.payway.com.kh/api/payment-gateway/v1/payments/purchase';
-  }
+
 
   /**
    * Generates checkout form data for PayWay payment
    * @param paymentData Payment and customer information
-   * @param useSandbox Whether to use sandbox environment (default: true)
    * @returns Checkout response with form data and API URL
    */
-  private createCheckoutPayment(paymentData: CheckoutPaymentData, useSandbox: boolean = true): CheckoutResponse {
+  private createCheckoutPayment(paymentData: CheckoutPaymentData): CheckoutResponse {
     const now = DateTime.now().toUTC().toFormat('yyyyMMddHHmmss');
     const returnParams = paymentData.returnParams || '';
 
@@ -188,11 +143,9 @@ class ABAPayWayClient {
       req_time: now
     };
 
-    const apiUrl = this.getCheckoutApiUrl(useSandbox);
-
     return {
       formData,
-      apiUrl
+      apiUrl: this.checkoutUrl
     };
   }
 
@@ -309,8 +262,8 @@ class ABAPayWayClient {
    * @param useSandbox Whether to use sandbox environment (default: true)
    * @returns Object containing HTML form and checkout URL
    */
-  public createCheckout(paymentData: CheckoutPaymentData, useSandbox: boolean = true): { htmlForm: string; checkoutUrl: string } {
-    const checkoutResponse = this.createCheckoutPayment(paymentData, useSandbox);
+  public createCheckout(paymentData: CheckoutPaymentData): { htmlForm: string; checkoutUrl: string } {
+    const checkoutResponse = this.createCheckoutPayment(paymentData);
     const htmlForm = this.generateCheckoutForm(checkoutResponse.formData, checkoutResponse.apiUrl);
 
     return {
@@ -332,8 +285,8 @@ export function createABACheckout(
 ): PaymentResponse {
   try {
     // Validate required configuration for checkout
-    if (!config.baseUrl || !config.merchantId || !config.apiKey) {
-      throw new Error('Missing required ABA PayWay configuration: baseUrl, merchantId, and apiKey are required');
+    if (!config.baseUrl || !config.checkoutUrl || !config.merchantId || !config.apiKey) {
+      throw new Error('Missing required ABA PayWay configuration: baseUrl, checkoutUrl, merchantId, and apiKey are required');
     }
 
     // Validate payment request
@@ -361,11 +314,8 @@ export function createABACheckout(
       returnParams: payment.returnParams || ''
     };
 
-    // Use sandbox by default
-    const useSandbox = config.sandbox !== false;
-
     // Generate checkout response and HTML form
-    const checkoutResult = client.createCheckout(checkoutData, useSandbox);
+    const checkoutResult = client.createCheckout(checkoutData);
 
     return {
       success: true,
